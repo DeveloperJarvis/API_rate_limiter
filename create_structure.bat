@@ -6,36 +6,79 @@ set ROOT=.
 
 REM Create directories if they do not exist
 call :create_folder "%ROOT%"
-call :create_folder "%ROOT%\bin"
+call :create_folder "%ROOT%\concurrency"
 call :create_folder "%ROOT%\config"
 call :create_folder "%ROOT%\docs"
+call :create_folder "%ROOT%\examples"
+call :create_folder "%ROOT%\limiter"
 call :create_folder "%ROOT%\logs"
-call :create_folder "%ROOT%\src"
+call :create_folder "%ROOT%\middleware"
+call :create_folder "%ROOT%\observability"
+call :create_folder "%ROOT%\protocol"
+call :create_folder "%ROOT%\state"
 call :create_folder "%ROOT%\tests"
+call :create_folder "%ROOT%\utils"
+call :create_folder "%ROOT%\tests\integration"
+call :create_folder "%ROOT%\tests\load"
+call :create_folder "%ROOT%\tests\unit"
 
 REM Create files only if they do not exist
 REM Python source files (with header)
+call :create_py_file "%ROOT%\main.py"
 call :create_py_file "%ROOT%\setup.py"
 
-call :create_py_file "%ROOT%\bin\run_detection.py"
+call :create_py_file "%ROOT%\concurrency\__init__.py"
+call :create_py_file "%ROOT%\concurrency\clock.py"
+call :create_py_file "%ROOT%\concurrency\locks.py"
 
-call :create_py_file "%ROOT%\config\config.py"
+call :create_py_file "%ROOT%\config\__init__.py"
+call :create_py_file "%ROOT%\config\constants.py"
+call :create_py_file "%ROOT%\config\settings.py"
 
-call :create_py_file "%ROOT%\src\__init__.py"
-call :create_py_file "%ROOT%\src\log_reader.py"
-call :create_py_file "%ROOT%\src\pattern_detector.py"
-call :create_py_file "%ROOT%\src\anomaly_detector.py"
-call :create_py_file "%ROOT%\src\storage.py"
-call :create_py_file "%ROOT%\src\report.py"
+call :create_py_file "%ROOT%\examples\__init__.py"
+call :create_py_file "%ROOT%\examples\leaky_bucket_basic.py"
+call :create_py_file "%ROOT%\examples\middleware_example.py"
+call :create_py_file "%ROOT%\examples\token_bucket_basic.py"
 
-call :create_py_file "%ROOT%\tests\__init__.py"
-call :create_py_file "%ROOT%\tests\test_log_reader.py"
-call :create_py_file "%ROOT%\tests\test_pattern_detector.py"
-call :create_py_file "%ROOT%\tests\test_anomaly_detector.py"
-call :create_py_file "%ROOT%\tests\test_storage.py"
+call :create_py_file "%ROOT%\limiter\__init__.py"
+call :create_py_file "%ROOT%\limiter\base.py"
+call :create_py_file "%ROOT%\limiter\leaky_bucket.py"
+call :create_py_file "%ROOT%\limiter\manager.py"
+call :create_py_file "%ROOT%\limiter\token_bucket.py"
+
+call :create_py_file "%ROOT%\middleware\__init__.py"
+call :create_py_file "%ROOT%\middleware\api_middleware.py"
+
+call :create_py_file "%ROOT%\observability\__init__.py"
+call :create_py_file "%ROOT%\observability\logger.py"
+call :create_py_file "%ROOT%\observability\metrics.py"
+
+call :create_py_file "%ROOT%\protocol\__init__.py"
+call :create_py_file "%ROOT%\protocol\request.py"
+call :create_py_file "%ROOT%\protocol\response.py"
+
+call :create_py_file "%ROOT%\state\__init__.py"
+call :create_py_file "%ROOT%\state\bucket.py"
+call :create_py_file "%ROOT%\state\memory_store.py"
+call :create_py_file "%ROOT%\state\repository.py"
+
+call :create_py_file "%ROOT%\utils\__init__.py"
+call :create_py_file "%ROOT%\utils\identifiers.py"
+
+call :create_py_file "%ROOT%\tests\integration\test_middleware_flow.py"
+call :create_py_file "%ROOT%\tests\integration\test_multi_client_limits.py"
+call :create_py_file "%ROOT%\tests\load\test_high_throughput.py"
+call :create_py_file "%ROOT%\tests\unit\test_concurrency.py"
+call :create_py_file "%ROOT%\tests\unit\test_leaky_bucket.py"
+call :create_py_file "%ROOT%\tests\unit\test_repository.py"
+call :create_py_file "%ROOT%\tests\unit\test_token_bucket.py"
 
 REM Non-Python files (empty)
-call :create_file "%ROOT%\logs\tool_execution.log"
+call :create_file "%ROOT%\docs\api.md"
+
+call :create_file "%ROOT%\examples\distributed_mode_note.md"
+
+call :create_file "%ROOT%\logs\api_rate_limiter.log"
 
 call :create_file "%ROOT%\requirements.txt"
 call :create_file "%ROOT%\README.md"
@@ -79,7 +122,7 @@ echo # -*- Python -*- Compatibility Header
 echo #
 echo # Copyright ^(C^) 2023 Developer Jarvis ^(Pen Name^)
 echo #
-echo # This file is part of the Log Pattern Detection Tool Library. This library is free
+echo # This file is part of the API Rate Limiter Library. This library is free
 echo # software; you can redistribute it and/or modify it under the
 echo # terms of the GNU General Public License as published by the
 echo # Free Software Foundation; either version 3, or ^(at your option^)
@@ -95,8 +138,8 @@ echo # along with this program. If not, see ^<https://www.gnu.org/licenses/^>.
 echo #
 echo # SPDX-License-Identifier: GPL-3.0-or-later
 echo #
-echo # Log Pattern Detection Tool - Find patterns and anomalies in large log files
-echo #                       Skills: streaming I/O, algorithms, regex
+echo # API Rate Limiter - Implement token-bucket or leaky-bucket algorithm
+echo #           Skills: algorithms, concurrency, API design
 echo #
 echo # Author: Developer Jarvis ^(Pen Name^)
 echo # Contact: https://github.com/DeveloperJarvis

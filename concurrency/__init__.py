@@ -30,8 +30,18 @@
 # --------------------------------------------------
 # __init__ MODULE
 # --------------------------------------------------
-
+"""
+Purpose: Explicit concurrency primitives export.
+"""
 # --------------------------------------------------
 # imports
 # --------------------------------------------------
+from .clock import SystemClock, Clock
+from .locks import LockManager
 
+
+__all__ = [
+    "Clock",
+    "SystemClock",
+    "LockManager",
+]

@@ -34,4 +34,39 @@
 # --------------------------------------------------
 # imports
 # --------------------------------------------------
+import threading
 
+from limiter.manager import RateLimitManager
+from config.settings import RateLimitConfig
+from protocol.request import Request
+from tests.utils.fake_clock import FakeClock
+
+
+def test_high_throughput_concurrent_requests():
+    manager = RateLimitManager()
+    config = RateLimitConfig(capacity=100, refill_rate=100)
+
+    clock = FakeClock(start=0.0)
+
+    manager.register_token_bucket(
+        "hot_client", config, clock=clock
+    )
+
+    request = Request(client_id="hot_client",
+                      enpoint="/load")
+    results = []
+
+    def worker():
+        decision = manager.allow_request(request)
+        results.append(decision.allowed)
+    
+    threads = [threading.Thread(target=worker)
+               for _ in range(200)]
+    
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+    # Should never allow more than capacity immediately
+    assert sum(results) == 100

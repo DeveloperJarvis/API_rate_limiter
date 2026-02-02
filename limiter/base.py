@@ -34,4 +34,19 @@
 # --------------------------------------------------
 # imports
 # --------------------------------------------------
+from abc import ABC, abstractmethod
+from protocol.request import Request
+from protocol.response import RateLimitDecision
 
+
+# --------------------------------------------------
+# base rate limiter
+# --------------------------------------------------
+class BaseRateLimiter(ABC):
+    """
+    Base interface for all rate limiters.
+    """
+
+    @abstractmethod
+    def allow(self, request: Request) -> RateLimitDecision:
+        raise NotImplementedError

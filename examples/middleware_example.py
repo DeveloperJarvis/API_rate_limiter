@@ -30,8 +30,54 @@
 # --------------------------------------------------
 # middleware_example MODULE
 # --------------------------------------------------
-
+"""
+Use case: API gateway / framework integration.
+"""
 # --------------------------------------------------
 # imports
 # --------------------------------------------------
+from limiter.manager import RateLimitManager
+from config.settings import RateLimitConfig
+from protocol.request import Request
+from middleware.api_middleware import RateLimitMiddleware
 
+
+def api_handler(request: Request):
+    return {"status": 200, "message": "OK"}
+
+
+def run():
+    manager = RateLimitManager()
+
+    config = RateLimitConfig(
+        capacity=2,
+        refill_rate=0.5     # 1 request every 2 seconds
+    )
+
+    manager.register_leaky_bucket("user_42", config)
+
+    middleware = RateLimitMiddleware(manager)
+
+    print("== Middleware Example ==")
+
+    for i in range(5):
+        request = Request(
+            client_id="user_42",
+            enpoint="/v1/orders"
+        )
+
+        decision = middleware.handle(request)
+
+        if decision.allowed:
+            response = api_handler(request)
+        else:
+            response = {
+                "status": 429,
+                "retry_after": decision.retry_after,
+            }
+        
+        print(f"[{i}] Response: ", response)
+
+
+if __name__ == "__main__":
+    run()

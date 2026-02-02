@@ -30,7 +30,14 @@
 # --------------------------------------------------
 # __init__ MODULE
 # --------------------------------------------------
+"""
+Example usage for the API Rate Limiter library.
 
+These examples demostrate:
+- Token Bucket
+- Leaky Bucket
+- Middleware integration
+"""
 # --------------------------------------------------
 # imports
 # --------------------------------------------------

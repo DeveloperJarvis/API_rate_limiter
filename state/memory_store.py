@@ -30,8 +30,35 @@
 # --------------------------------------------------
 # memory_store MODULE
 # --------------------------------------------------
+"""
+In-memory bucket repository.
 
+Used for:
+- Single-instance deployments
+- Tests
+- Local development
+"""
 # --------------------------------------------------
 # imports
 # --------------------------------------------------
+from typing import Dict, Optional
+from state.bucket import TokenBucketState
+from state.repository import BucketRepository
 
+
+# --------------------------------------------------
+# in memory bucket repository
+# --------------------------------------------------
+class InMemoryBucketRepository(BucketRepository):
+    def __init__(self):
+        self._store: Dict[str, TokenBucketState] = {}
+    
+    def get(self, key: str) -> Optional[TokenBucketState]:
+        return self._store.get(key)
+    
+    def save(self, key: str,
+             bucket: TokenBucketState) -> None:
+        self._store[key] = bucket
+    
+    def delete(self, key: str) -> None:
+        self._store.pop(key, None)

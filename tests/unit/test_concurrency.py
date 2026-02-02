@@ -34,4 +34,30 @@
 # --------------------------------------------------
 # imports
 # --------------------------------------------------
+import threading
+from concurrency.locks import LockManager
 
+
+def test_lock_manager_serializes_access():
+    locks = LockManager()
+    key = "client_x"
+    counter = 0
+
+    def critical_section():
+        nonlocal counter
+        locks.acquire(key)
+        try:
+            tmp = counter
+            counter = tmp + 1
+        finally:
+            locks.release(key)
+    
+    threads = [threading.Thread(target=critical_section)
+               for _ in range(50)]
+    
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    
+    assert counter == 50

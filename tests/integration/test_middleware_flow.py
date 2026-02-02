@@ -34,4 +34,26 @@
 # --------------------------------------------------
 # imports
 # --------------------------------------------------
+from limiter.manager import RateLimitManager
+from middleware.api_middleware import RateLimitMiddleware
+from config.settings import RateLimitConfig
+from protocol.request import Request
 
+
+def test_middleware_allows_and_blocks_requests():
+    manager = RateLimitManager()
+    config = RateLimitConfig(capacity=2, refill_rate=1)
+
+    manager.register_leaky_bucket("client_1", config)
+    middleware = RateLimitMiddleware(manager)
+
+    req = Request(client_id="client_1", enpoint="/test")
+
+    # First two requests allowed
+    assert middleware.handle(req).allowed is True
+    assert middleware.handle(req).allowed is True
+
+    # Third request rejected
+    decision = middleware.handle(req)
+    assert decision.allowed is False
+    assert decision.retry_after is not None

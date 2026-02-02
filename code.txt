@@ -1,0 +1,894 @@
+# main.py:
+"""
+Main entry point for API Rate Limiter library.
+This file is intentionally minimal.
+In real deployments, the limiter is imported
+into an API gateway or middleware layer.
+"""
+from limiter.manager import RateLimitManager
+from config.settings import RateLimitConfig
+from protocol.request import Request
+def main():
+    config = RateLimitConfig(
+        capacity=10,
+        refill_rate=2,                     
+    )
+    rate_limiter = RateLimitManager()
+    rate_limiter.register_leaky_bucket(
+        "demo_client", config
+    )
+    for i in range(15):
+        request = Request(client_id="demo_client",
+                          enpoint="/health")
+        decision = rate_limiter.allow_request(request)
+        if decision.allowed:
+            print(f"[{i}] ✅ Allowed | Remaining: "
+                  f"{decision.remaining}")
+        else:
+            print(f"[{i}] ❌ Rejected | Retry after: "
+                  f"{decision.retry_after}s")
+if __name__ == "__main__":
+    main()
+
+
+# setup.py:
+"""
+Purpose: Package definition (pip-installable, GPL
+compatible).
+"""
+from setuptools import setup, find_packages
+setup(
+    name="api-rate-limiter",
+    version="0.1.0",
+    description="Concurrency-safe API Rate Limiter using Token & Leaky Bucket alogrithms",
+    author="Developer Jarvis",
+    author_email="developerjarvis@github.com",
+    license="GPL-3.0-or-later",
+    packages=find_packages(exclude=("tests*", "logs*")),
+    python_requires=">=3.8",
+    install_requires=[],
+    extras_require={
+        "dev": [
+            "pytest",
+            "black",
+            "flake8",
+            "mypy",
+        ]
+    },
+    classifiers=[
+        "Programming Language :: Python :: 3",
+        "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
+        "Operating System :: OS Independent",
+    ],
+)
+
+
+# concurrency\__init__.py:
+"""
+Purpose: Explicit concurrency primitives export.
+"""
+from .clock import SystemClock, Clock
+from .locks import LockManager
+__all__ = [
+    "Clock",
+    "SystemClock",
+    "LockManager",
+]
+
+
+# concurrency\clock.py:
+"""
+Purpose: Deterministic, mockable time source.
+Clock abstraction
+Avoids direct calls to time.time() throughout the 
+codebase.
+Critical for testing and deterministic behaviour.
+"""
+import time
+class Clock():
+    """Abstract clock interface."""
+    def now(self) -> float:
+        """Returns current time in seconds."""
+        raise NotImplementedError
+class SystemClock(Clock):
+    """Production clock using system time."""
+    def now(self) -> float:
+        return time.time()
+
+
+# concurrency\locks.py:
+"""
+Lock management for concurrency control.
+Deisgn goal:
+- One lock per client bucket
+- Avoid global contention
+"""
+import threading
+from collections import defaultdict
+class LockManager:
+    """
+    Manages locks keyed by client ID.
+    Ensures serialized  access to per-client bucket
+    state without introducing global locks.
+    """
+    def __init__(self):
+        self._locks = defaultdict(threading.Lock)
+        self._manager_lock = threading.Lock()
+    def acquire(self, key: str):
+        """
+        Aquire lock for a given key
+        """
+        with self._manager_lock:
+            lock = self._locks[key]
+        lock.acquire()
+    def release(self, key: str):
+        """
+        Release lock for a given key
+        """
+        lock = self._locks.get(key)
+        if lock:
+            lock.release()
+
+
+# config\__init__.py:
+from .settings import RateLimitConfig
+from .constants import (
+    DEFAULT_CAPACITY,
+    DEFAULT_REFILL_RATE,
+)
+__all__ = [
+    "RateLimitConfig",
+    "DEFAULT_CAPACITY",
+    "DEFAULT_REFILL_RATE",
+]
+
+
+# config\constants.py:
+"""
+Purpose: Central place for defaults & magic numbers.
+"""
+import os
+DEFAULT_CAPACITY = 100
+DEFAULT_REFILL_RATE = 10                       
+HTTP_TOO_MANY_REQUESTS = 429
+SECONDS = 1.0
+PARENT_DIR = os.path.join(
+    os.path.abspath(__file__), "..", ".."
+)
+LOG_DIR = os.path.join(PARENT_DIR, "logs")
+LOG_FILE = os.path.join(LOG_DIR, "api_rate_limiter.log")
+LOG_FORMAT = "%(asctime)s | %(levelname)s | %(message)s"
+
+
+# config\settings.py:
+"""
+Purpose: Immutable, validated rate-limit configuration.
+"""
+from dataclasses import dataclass
+from config.constants import (
+    DEFAULT_CAPACITY,
+    DEFAULT_REFILL_RATE
+)
+@dataclass(frozen=True)
+class RateLimitConfig:
+    """
+    Configuration for a rate limiter bucket.
+    capacity:
+        Maximum tokens (or queue size)
+    refill_rate:
+        Tokens added per second (Token Bucket)
+        OR
+        Requests drained per second (Leaky Bucket)
+    """
+    capacity: int = DEFAULT_CAPACITY
+    refill_rate: float = DEFAULT_REFILL_RATE
+    def __post_init__(self):
+        if self.capacity <= 0:
+            raise ValueError("capacity must be > 0")
+        if self.refill_rate <= 0:
+            raise ValueError("refill_rate must be > 0")
+
+
+# examples\__init__.py:
+"""
+Example usage for the API Rate Limiter library.
+These examples demostrate:
+- Token Bucket
+- Leaky Bucket
+- Middleware integration
+"""
+
+
+# examples\leaky_bucket_basic.py:
+"""
+Use case: Smooth, internal service traffic.
+"""
+import time
+from limiter.manager import RateLimitManager
+from config.settings import RateLimitConfig
+from protocol.request import Request
+def run():
+    manager = RateLimitManager()
+    config = RateLimitConfig(
+        capacity=3,
+        refill_rate=1                             
+    )
+    manager.register_leaky_bucket("service_X", config)
+    print("== Leaky Bucket Example ==")
+    for i in range(6):
+        request = Request(
+            client_id="service_X",
+            enpoint="/internal/job"
+        )
+        decision = manager.allow_request(request)
+        print(
+            f"[{i}]",
+            ("✅ Allowed" if decision.allowed 
+             else "❌ Rejected"),
+             f"| remaining={decision.remaining}",
+        )
+        time.sleep(0.2)
+if __name__ == "__main__":
+    run()
+
+
+# examples\middleware_example.py:
+"""
+Use case: API gateway / framework integration.
+"""
+from limiter.manager import RateLimitManager
+from config.settings import RateLimitConfig
+from protocol.request import Request
+from middleware.api_middleware import RateLimitMiddleware
+def api_handler(request: Request):
+    return {"status": 200, "message": "OK"}
+def run():
+    manager = RateLimitManager()
+    config = RateLimitConfig(
+        capacity=2,
+        refill_rate=0.5                                
+    )
+    manager.register_leaky_bucket("user_42", config)
+    middleware = RateLimitMiddleware(manager)
+    print("== Middleware Example ==")
+    for i in range(5):
+        request = Request(
+            client_id="user_42",
+            enpoint="/v1/orders"
+        )
+        decision = middleware.handle(request)
+        if decision.allowed:
+            response = api_handler(request)
+        else:
+            response = {
+                "status": 429,
+                "retry_after": decision.retry_after,
+            }
+        print(f"[{i}] Response: ", response)
+if __name__ == "__main__":
+    run()
+
+
+# examples\token_bucket_basic.py:
+"""
+Use case: Bursty public API traffic.
+"""
+import time
+from limiter.manager import RateLimitManager
+from config.settings import RateLimitConfig
+from protocol.request import Request
+def run():
+    manager = RateLimitManager()
+    config = RateLimitConfig(
+        capacity=5,
+        refill_rate=1                     
+    )
+    manager.register_leaky_bucket("client_A", config)
+    print("== Token Bucket Example ==")
+    for i in range(10):
+        request = Request(
+            client_id="client_A",
+            enpoint="/api/data"
+        )
+        decision = manager.allow_request(request)
+        if decision.allowed:
+            print(f"[{i}] ✅ Allowed | Remaining: "
+                  f"{decision.remaining}")
+        else:
+            print(f"[{i}] ❌ Rejected | Retry after: "
+                  f"{decision.retry_after}s")
+        time.sleep(0.3)
+if __name__ == "__main__":
+    run()
+
+
+# limiter\__init__.py:
+from .base import BaseRateLimiter
+from .token_bucket import TokenBucketLimiter
+from .leaky_bucket import LeakyBucketLimiter
+from .manager import RateLimitManager
+__all__ = [
+    "BaseRateLimiter",
+    "TokenBucketLimiter",
+    "LeakyBucketLimiter",
+    "RateLimitManager",
+]
+
+
+# limiter\base.py:
+from abc import ABC, abstractmethod
+from protocol.request import Request
+from protocol.response import RateLimitDecision
+class BaseRateLimiter(ABC):
+    """
+    Base interface for all rate limiters.
+    """
+    @abstractmethod
+    def allow(self, request: Request) -> RateLimitDecision:
+        raise NotImplementedError
+
+
+# limiter\leaky_bucket.py:
+from limiter.base import BaseRateLimiter
+from protocol.request import Request
+from protocol.response import RateLimitDecision
+from concurrency.clock import Clock, SystemClock
+from concurrency.locks import LockManager
+from state.repository import BucketRepository
+from config.settings import RateLimitConfig
+class LeakyBucketLimiter(BaseRateLimiter):
+    """
+    Simplified leaky bucket:
+    - capacity = max queued requests
+    - refill_rate = drain rate (req/sec)
+    """
+    def __init__(
+            self,
+            repository: BucketRepository,
+            lock_manager: LockManager,
+            config: RateLimitConfig,
+            clock: Clock = None,
+        ):
+        self._repo = repository
+        self._locks = lock_manager
+        self._config = config
+        self._clock = clock or SystemClock()
+    def allow(self, request: Request) -> RateLimitDecision:
+        key = request.client_id
+        now = self._clock.now()
+        self._locks.acquire(key)
+        try:
+            bucket = self._repo.get(key)
+            if bucket is None:
+                bucket = {
+                    "queue": 0,
+                    "last_drain": now,
+                }
+            elapsed = now - bucket["last_drain"]
+            drained = int(
+                elapsed * self._config.refill_rate)
+            if drained > 0:
+                bucket["queue"] = max(
+                    0, bucket["queue"] - drained
+                )
+                bucket["last_drain"] = now
+            if bucket["queue"] < self._config.capacity:
+                bucket["queue"] += 1
+                self._repo.save(key, bucket)
+                return RateLimitDecision(
+                    allowed=True,
+                    remaining=(self._config.capacity
+                               - bucket["queue"]),
+                )
+            self._repo.save(key, bucket)
+            return RateLimitDecision(
+                allowed=False,
+                remaining=0,
+                retry_after=1 / self._config.refill_rate,
+            )
+        finally:
+            self._locks.release(key)
+
+
+# limiter\manager.py:
+from typing import Dict
+from limiter.token_bucket import TokenBucketLimiter
+from limiter.leaky_bucket import LeakyBucketLimiter
+from concurrency.locks import LockManager
+from state.memory_store import InMemoryBucketRepository
+from config.settings import RateLimitConfig
+from protocol.request import Request
+from protocol.response import RateLimitDecision
+class RateLimitManager:
+    """
+    Entry point for rate limiting decisions.
+    """
+    def __init__(self):
+        self._lock_manager = LockManager()
+        self._repository = InMemoryBucketRepository()
+        self._limiters: Dict[str, object] = {}
+    def register_leaky_bucket(
+            self, key: str, config: RateLimitConfig
+        ):
+        self._limiters[key] = LeakyBucketLimiter(
+            self._repository,
+            self._lock_manager,
+            config,
+        )
+    def register_token_bucket(
+            self,
+            key: str,
+            config: RateLimitConfig,
+            clock=None,
+        ):
+        self._limiters[key] = TokenBucketLimiter(
+            self._repository,
+            self._lock_manager,
+            config,
+            clock=clock,
+        )
+    def allow_request(
+            self, request: Request
+        ) -> RateLimitDecision:
+        limiter = self._limiters.get(request.client_id)
+        if not limiter:
+            return RateLimitDecision(
+                allowed=True, remaining=0
+            )
+        return limiter.allow(request)
+
+
+# limiter\token_bucket.py:
+from limiter.base import BaseRateLimiter
+from protocol.request import Request
+from protocol.response import RateLimitDecision
+from state.bucket import TokenBucketState
+from concurrency.clock import Clock, SystemClock
+from concurrency.locks import LockManager
+from state.repository import BucketRepository
+from config.settings import RateLimitConfig
+class TokenBucketLimiter(BaseRateLimiter):
+    def __init__(
+            self,
+            repository: BucketRepository,
+            lock_manager: LockManager,
+            config: RateLimitConfig,
+            clock: Clock = None,
+        ):
+        self._repo = repository
+        self._locks = lock_manager
+        self._config = config
+        self._clock = clock or SystemClock()
+    def allow(self, request: Request) -> RateLimitDecision:
+        key = request.client_id
+        now = self._clock.now()
+        self._locks.acquire(key)
+        try:
+            bucket = self._repo.get(key)
+            if bucket is None:
+                bucket = TokenBucketState(
+                    capacity=self._config.capacity,
+                    refill_rate=self._config.refill_rate,
+                    current_tokens=self._config.capacity,
+                    last_refill_timestamp=now,
+                )
+            bucket.refill(now)
+            if bucket.consume(1):
+                self._repo.save(key, bucket)
+                return RateLimitDecision(
+                    allowed=True,
+                    remaining=int(bucket.current_tokens),
+                )
+            retry_after = (1 / self._config.refill_rate)
+            self._repo.save(key, bucket)
+            return RateLimitDecision(
+                allowed=False,
+                remaining=int(bucket.current_tokens),
+                retry_after=retry_after,
+            )
+        finally:
+            self._locks.release(key)
+
+
+# middleware\__init__.py:
+from .api_middleware import RateLimitMiddleware
+__all__ = [
+    "RateLimitMiddleware",
+]
+
+
+# middleware\api_middleware.py:
+from limiter.manager import RateLimitManager
+from protocol.request import Request
+from observability.logger import log_throttled
+from observability.metrics import record_decision
+class RateLimitMiddleware:
+    def __init__(self, rate_limiter: RateLimitManager):
+        self._rate_limiter = rate_limiter
+    def handle(self, request: Request):
+        decision = self._rate_limiter.allow_request(request)
+        record_decision(request.client_id,
+                        decision.allowed)
+        if not decision.allowed:
+            log_throttled(request.client_id,
+                          request.enpoint)
+        return decision
+
+
+# observability\__init__.py:
+from .logger import log_throttled
+from .metrics import record_decision
+__all__ = [
+    "log_throttled",
+    "record_decision",
+]
+
+
+# observability\logger.py:
+import logging
+from config.constants import LOG_FILE, LOG_FORMAT
+logger = logging.getLogger("api_rate_limiter")
+logger.setLevel(logging.INFO)
+handler = logging.FileHandler(LOG_FILE)
+formatter = logging.Formatter(LOG_FORMAT)
+handler.setFormatter(formatter)
+logger.addHandler(handler)
+def log_throttled(client_id: str, endpoint: str):
+    logger.warning(
+        f"Rate limit exceeded | client={client_id} "
+        f"endpoint={endpoint}"
+    )
+
+
+# observability\metrics.py:
+from collections import defaultdict
+_allowed = defaultdict(int)
+_rejected = defaultdict(int)
+def record_decision(client_id: str, allowed: bool):
+    if allowed:
+        _allowed[client_id] += 1
+    else:
+        _rejected[client_id] += 1
+def snapshot():
+    return {
+        "allowed": dict(_allowed),
+        "rejected": dict(_rejected),
+    }
+
+
+# protocol\__init__.py:
+from .request import Request
+from .response import RateLimitDecision
+__all__ = [
+    "Request",
+    "RateLimitDecision",
+]
+
+
+# protocol\request.py:
+from dataclasses import dataclass
+from typing import Optional
+@dataclass(frozen=True)
+class Request:
+    """
+    Logical request representation for rate limiting.
+    This is intentionally decoupled from any web
+    framework.
+    """
+    client_id: Optional[str] = None
+    enpoint: Optional[str] = None
+    api_key: Optional[str] = None
+    user_id: Optional[str] = None
+    ip_address: Optional[str] = None
+    timestamp: Optional[float] = None
+
+
+# protocol\response.py:
+from dataclasses import dataclass
+from typing import Optional
+@dataclass(frozen=True)
+class RateLimitDecision:
+    """
+    Result of a rate limit check.
+    """
+    allowed: bool
+    remaining: int
+    retry_after: Optional[float] = None
+
+
+# state\__init__.py:
+from .bucket import TokenBucketState
+from .repository import BucketRepository
+from .memory_store import InMemoryBucketRepository
+__all__ = [
+    "TokenBucketState",
+    "BucketRepository",
+    "InMemoryBucketRepository",
+]
+
+
+# state\bucket.py:
+"""
+Bucket state is intentionally dumb.
+Concurrency control is handled outside
+(via LockManager or atomic store ops).
+"""
+from dataclasses import dataclass
+@dataclass
+class TokenBucketState:
+    """
+    Mutable token bucket state.
+    """
+    capacity: int
+    refill_rate: float                     
+    current_tokens: float
+    last_refill_timestamp: float
+    def refill(self, now: float) -> None:
+        """
+        Refill tokens based on elapsed time.
+        """
+        elapsed = now - self.last_refill_timestamp
+        if elapsed <= 0:
+            return
+        added_tokens = elapsed * self.refill_rate
+        self.current_tokens = min(
+            self.capacity,
+            self.current_tokens + added_tokens
+        )
+        self.last_refill_timestamp = now
+    def consume(self, tokens: int = 1) -> bool:
+        """
+        Attempt to consume tokens.
+        """
+        if self.current_tokens >= tokens:
+            self.current_tokens -= tokens
+            return True
+        return False
+
+
+# state\memory_store.py:
+"""
+In-memory bucket repository.
+Used for:
+- Single-instance deployments
+- Tests
+- Local development
+"""
+from typing import Dict, Optional
+from state.bucket import TokenBucketState
+from state.repository import BucketRepository
+class InMemoryBucketRepository(BucketRepository):
+    def __init__(self):
+        self._store: Dict[str, TokenBucketState] = {}
+    def get(self, key: str) -> Optional[TokenBucketState]:
+        return self._store.get(key)
+    def save(self, key: str,
+             bucket: TokenBucketState) -> None:
+        self._store[key] = bucket
+    def delete(self, key: str) -> None:
+        self._store.pop(key, None)
+
+
+# state\repository.py:
+from abc import ABC, abstractmethod
+from typing import Optional
+from state.bucket import TokenBucketState
+class BucketRepository(ABC):
+    """
+    Abstract repository for bucket state.
+    """
+    @abstractmethod
+    def get(self, key: str) -> Optional[TokenBucketState]:
+        raise NotImplementedError
+    @abstractmethod
+    def save(self, key: str,
+             bucket: TokenBucketState) -> None:
+        raise NotImplementedError
+    @abstractmethod
+    def delete(self, key: str) -> None:
+        raise NotImplementedError
+
+
+# tests\__init__.py:
+
+
+
+# tests\integration\test_middleware_flow.py:
+from limiter.manager import RateLimitManager
+from middleware.api_middleware import RateLimitMiddleware
+from config.settings import RateLimitConfig
+from protocol.request import Request
+def test_middleware_allows_and_blocks_requests():
+    manager = RateLimitManager()
+    config = RateLimitConfig(capacity=2, refill_rate=1)
+    manager.register_leaky_bucket("client_1", config)
+    middleware = RateLimitMiddleware(manager)
+    req = Request(client_id="client_1", enpoint="/test")
+    assert middleware.handle(req).allowed is True
+    assert middleware.handle(req).allowed is True
+    decision = middleware.handle(req)
+    assert decision.allowed is False
+    assert decision.retry_after is not None
+
+
+# tests\integration\test_multi_client_limits.py:
+from limiter.manager import RateLimitManager
+from config.settings import RateLimitConfig
+from protocol.request import Request
+def test_multiple_clients_isolated_limits():
+    manager = RateLimitManager()
+    config = RateLimitConfig(capacity=1, refill_rate=1)
+    manager.register_leaky_bucket("client_A", config)
+    manager.register_leaky_bucket("client_B", config)
+    req_a = Request(client_id="client_A", enpoint="/a")
+    req_b = Request(client_id="client_B", enpoint="/x")
+    assert manager.allow_request(req_a).allowed is True
+    assert manager.allow_request(req_a).allowed is False
+    assert manager.allow_request(req_b).allowed is True
+
+
+# tests\load\test_high_throughput.py:
+import threading
+from limiter.manager import RateLimitManager
+from config.settings import RateLimitConfig
+from protocol.request import Request
+from ..utils.fake_clock import FakeClock
+def test_high_throughput_concurrent_requests():
+    manager = RateLimitManager()
+    config = RateLimitConfig(capacity=100, refill_rate=100)
+    clock = FakeClock(start=0.0)
+    manager.register_token_bucket(
+        "hot_client", config, clock=clock
+    )
+    request = Request(client_id="hot_client",
+                      enpoint="/load")
+    results = []
+    def worker():
+        decision = manager.allow_request(request)
+        results.append(decision.allowed)
+    threads = [threading.Thread(target=worker)
+               for _ in range(200)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    assert sum(results) == 100
+
+
+# tests\unit\test_concurrency.py:
+import threading
+from concurrency.locks import LockManager
+def test_lock_manager_serializes_access():
+    locks = LockManager()
+    key = "client_x"
+    counter = 0
+    def critical_section():
+        nonlocal counter
+        locks.acquire(key)
+        try:
+            tmp = counter
+            counter = tmp + 1
+        finally:
+            locks.release(key)
+    threads = [threading.Thread(target=critical_section)
+               for _ in range(50)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    assert counter == 50
+
+
+# tests\unit\test_leaky_bucket.py:
+import time
+from limiter.leaky_bucket import LeakyBucketLimiter
+from config.settings import RateLimitConfig
+from state.memory_store import InMemoryBucketRepository
+from concurrency.locks import LockManager
+from protocol.request import Request
+def test_leaky_bucket_smooths_traffic():
+    repo = InMemoryBucketRepository()
+    locks = LockManager()
+    config = RateLimitConfig(capacity=2, refill_rate=1)
+    limiter = LeakyBucketLimiter(repo, locks, config)
+    req = Request(client_id="svc", enpoint="/job")
+    assert limiter.allow(req).allowed is True
+    assert limiter.allow(req).allowed is True
+    assert limiter.allow(req).allowed is False
+    time.sleep(1.1)
+    assert limiter.allow(req).allowed is True
+
+
+# tests\unit\test_repository.py:
+from state.memory_store import InMemoryBucketRepository
+from state.bucket import TokenBucketState
+def test_in_memory_repository_crud():
+    repo = InMemoryBucketRepository()
+    bucket = TokenBucketState(
+        capacity=10,
+        refill_rate=1,
+        current_tokens=5,
+        last_refill_timestamp=0,
+    )
+    repo.save("client", bucket)
+    assert repo.get("client") is bucket
+    repo.delete("client")
+    assert repo.get("client") is None
+
+
+# tests\unit\test_token_bucket.py:
+import time
+from limiter.token_bucket import TokenBucketLimiter
+from config.settings import RateLimitConfig
+from state.memory_store import InMemoryBucketRepository
+from concurrency.locks import LockManager
+from protocol.request import Request
+def test_token_bucket_allows_burst_then_throttles():
+    repo = InMemoryBucketRepository()
+    locks = LockManager()
+    config = RateLimitConfig(capacity=2, refill_rate=1)
+    limiter = TokenBucketLimiter(repo, locks, config)
+    req = Request(client_id="client", enpoint="/api")
+    assert limiter.allow(req).allowed is True
+    assert limiter.allow(req).allowed is True
+    assert limiter.allow(req).allowed is False
+def test_token_bucket_refills_over_time():
+    repo = InMemoryBucketRepository()
+    locks = LockManager()
+    config = RateLimitConfig(capacity=1, refill_rate=1)
+    limiter = TokenBucketLimiter(repo, locks, config)
+    req = Request(client_id="client", enpoint="/api")
+    assert limiter.allow(req).allowed is True
+    assert limiter.allow(req).allowed is False
+    time.sleep(1.1)
+    assert limiter.allow(req).allowed is True
+
+
+# tests\utils\__init__.py:
+from .fake_clock import FakeClock
+__all__ = [
+    "FakeClock",
+]
+
+
+# tests\utils\fake_clock.py:
+class FakeClock:
+    def __init__(self, start: float = 0.0):
+        self._now = start
+    def now(self) -> float:
+        return self._now
+
+
+# utils\__init__.py:
+from .identifiers import extract_client_id
+__all__ = [
+    "extract_client_id",
+]
+
+
+# utils\identifiers.py:
+"""
+Client identity utilities.
+The rate limiter MUST NOT trust client-supplied counters.
+Only identity extraction logic lives here.
+"""
+from typing import Optional
+from protocol.request import Request
+def extract_client_id(request: Request) -> Optional[str]:
+    """
+    Extracts the canonical client identifier used for rate
+    limiting.
+    Priority order:
+    1. Authenticated API key
+    2. User ID
+    3. IP address
+    Returns:
+        client_id (str) or None if not identifiable
+    """
+    if request.api_key:
+        return request.api_key
+    if request.user_id:
+        return request.user_id
+    return request.ip_address
+
+

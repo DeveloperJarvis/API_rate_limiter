@@ -30,8 +30,37 @@
 # --------------------------------------------------
 # identifiers MODULE
 # --------------------------------------------------
+"""
+Client identity utilities.
 
+The rate limiter MUST NOT trust client-supplied counters.
+Only identity extraction logic lives here.
+"""
 # --------------------------------------------------
 # imports
 # --------------------------------------------------
+from typing import Optional
+from protocol.request import Request
 
+
+def extract_client_id(request: Request) -> Optional[str]:
+    """
+    Extracts the canonical client identifier used for rate
+    limiting.
+
+    Priority order:
+    1. Authenticated API key
+    2. User ID
+    3. IP address
+
+    Returns:
+        client_id (str) or None if not identifiable
+    """
+
+    if request.api_key:
+        return request.api_key
+    
+    if request.user_id:
+        return request.user_id
+    
+    return request.ip_address

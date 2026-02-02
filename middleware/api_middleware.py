@@ -34,4 +34,27 @@
 # --------------------------------------------------
 # imports
 # --------------------------------------------------
+from limiter.manager import RateLimitManager
+from protocol.request import Request
+from observability.logger import log_throttled
+from observability.metrics import record_decision
 
+
+# --------------------------------------------------
+# rate limit middleware
+# --------------------------------------------------
+class RateLimitMiddleware:
+    def __init__(self, rate_limiter: RateLimitManager):
+        self._rate_limiter = rate_limiter
+    
+    def handle(self, request: Request):
+        decision = self._rate_limiter.allow_request(request)
+
+        record_decision(request.client_id,
+                        decision.allowed)
+        
+        if not decision.allowed:
+            log_throttled(request.client_id,
+                          request.enpoint)
+        
+        return decision

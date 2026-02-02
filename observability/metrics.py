@@ -34,4 +34,22 @@
 # --------------------------------------------------
 # imports
 # --------------------------------------------------
+from collections import defaultdict
 
+
+_allowed = defaultdict(int)
+_rejected = defaultdict(int)
+
+
+def record_decision(client_id: str, allowed: bool):
+    if allowed:
+        _allowed[client_id] += 1
+    else:
+        _rejected[client_id] += 1
+
+
+def snapshot():
+    return {
+        "allowed": dict(_allowed),
+        "rejected": dict(_rejected),
+    }

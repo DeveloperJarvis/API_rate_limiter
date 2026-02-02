@@ -21,6 +21,7 @@ call :create_folder "%ROOT%\utils"
 call :create_folder "%ROOT%\tests\integration"
 call :create_folder "%ROOT%\tests\load"
 call :create_folder "%ROOT%\tests\unit"
+call :create_folder "%ROOT%\tests\utils"
 
 REM Create files only if they do not exist
 REM Python source files (with header)
@@ -65,13 +66,19 @@ call :create_py_file "%ROOT%\state\repository.py"
 call :create_py_file "%ROOT%\utils\__init__.py"
 call :create_py_file "%ROOT%\utils\identifiers.py"
 
+call :create_py_file "%ROOT%\tests\__init__.py"
+call :create_py_file "%ROOT%\tests\integration\__init__.py"
 call :create_py_file "%ROOT%\tests\integration\test_middleware_flow.py"
 call :create_py_file "%ROOT%\tests\integration\test_multi_client_limits.py"
+call :create_py_file "%ROOT%\tests\load\__init__.py"
 call :create_py_file "%ROOT%\tests\load\test_high_throughput.py"
+call :create_py_file "%ROOT%\tests\unit\__init__.py"
 call :create_py_file "%ROOT%\tests\unit\test_concurrency.py"
 call :create_py_file "%ROOT%\tests\unit\test_leaky_bucket.py"
 call :create_py_file "%ROOT%\tests\unit\test_repository.py"
 call :create_py_file "%ROOT%\tests\unit\test_token_bucket.py"
+call :create_py_file "%ROOT%\tests\utils\__init__.py"
+call :create_py_file "%ROOT%\tests\utils\fake_clock.py"
 
 REM Non-Python files (empty)
 call :create_file "%ROOT%\docs\api.md"

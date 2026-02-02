@@ -34,4 +34,23 @@
 # --------------------------------------------------
 # imports
 # --------------------------------------------------
+from limiter.manager import RateLimitManager
+from config.settings import RateLimitConfig
+from protocol.request import Request
 
+
+def test_multiple_clients_isolated_limits():
+    manager = RateLimitManager()
+    config = RateLimitConfig(capacity=1, refill_rate=1)
+
+    manager.register_leaky_bucket("client_A", config)
+    manager.register_leaky_bucket("client_B", config)
+
+    req_a = Request(client_id="client_A", enpoint="/a")
+    req_b = Request(client_id="client_B", enpoint="/x")
+
+    assert manager.allow_request(req_a).allowed is True
+    assert manager.allow_request(req_a).allowed is False
+
+    # Client B unaffected
+    assert manager.allow_request(req_b).allowed is True

@@ -34,4 +34,22 @@
 # --------------------------------------------------
 # imports
 # --------------------------------------------------
+from state.memory_store import InMemoryBucketRepository
+from state.bucket import TokenBucketState
 
+
+def test_in_memory_repository_crud():
+    repo = InMemoryBucketRepository()
+
+    bucket = TokenBucketState(
+        capacity=10,
+        refill_rate=1,
+        current_tokens=5,
+        last_refill_timestamp=0,
+    )
+
+    repo.save("client", bucket)
+    assert repo.get("client") is bucket
+
+    repo.delete("client")
+    assert repo.get("client") is None

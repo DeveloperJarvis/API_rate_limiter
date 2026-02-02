@@ -34,9 +34,4 @@
 # --------------------------------------------------
 # imports
 # --------------------------------------------------
-from .identifiers import extract_client_id
 
-
-__all__ = [
-    "extract_client_id",
-]

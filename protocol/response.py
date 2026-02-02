@@ -34,4 +34,19 @@
 # --------------------------------------------------
 # imports
 # --------------------------------------------------
+from dataclasses import dataclass
+from typing import Optional
 
+
+# --------------------------------------------------
+# rate limit decision
+# --------------------------------------------------
+@dataclass(frozen=True)
+class RateLimitDecision:
+    """
+    Result of a rate limit check.
+    """
+
+    allowed: bool
+    remaining: int
+    retry_after: Optional[float] = None

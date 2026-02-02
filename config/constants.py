@@ -30,8 +30,28 @@
 # --------------------------------------------------
 # constants MODULE
 # --------------------------------------------------
-
+"""
+Purpose: Central place for defaults & magic numbers.
+"""
 # --------------------------------------------------
 # imports
 # --------------------------------------------------
+import os
 
+
+DEFAULT_CAPACITY = 100
+DEFAULT_REFILL_RATE = 10    # tokens per second
+
+# HTTP
+HTTP_TOO_MANY_REQUESTS = 429
+
+# Time
+SECONDS = 1.0
+
+# Logging
+PARENT_DIR = os.path.join(
+    os.path.abspath(__file__), "..", ".."
+)
+LOG_DIR = os.path.join(PARENT_DIR, "logs")
+LOG_FILE = os.path.join(LOG_DIR, "api_rate_limiter.log")
+LOG_FORMAT = "%(asctime)s | %(levelname)s | %(message)s"

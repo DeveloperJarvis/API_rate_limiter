@@ -34,4 +34,28 @@
 # --------------------------------------------------
 # imports
 # --------------------------------------------------
+from abc import ABC, abstractmethod
+from typing import Optional
+from state.bucket import TokenBucketState
 
+
+# --------------------------------------------------
+# bucket repository
+# --------------------------------------------------
+class BucketRepository(ABC):
+    """
+    Abstract repository for bucket state.
+    """
+
+    @abstractmethod
+    def get(self, key: str) -> Optional[TokenBucketState]:
+        raise NotImplementedError
+    
+    @abstractmethod
+    def save(self, key: str,
+             bucket: TokenBucketState) -> None:
+        raise NotImplementedError
+    
+    @abstractmethod
+    def delete(self, key: str) -> None:
+        raise NotImplementedError

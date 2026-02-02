@@ -30,8 +30,39 @@
 # --------------------------------------------------
 # clock MODULE
 # --------------------------------------------------
+"""
+Purpose: Deterministic, mockable time source.
 
+Clock abstraction
+
+Avoids direct calls to time.time() throughout the 
+codebase.
+Critical for testing and deterministic behaviour.
+"""
 # --------------------------------------------------
 # imports
 # --------------------------------------------------
+import time
+# from abc import ABC, abstractmethod
 
+
+# --------------------------------------------------
+# clock
+# --------------------------------------------------
+class Clock():
+    """Abstract clock interface."""
+
+    def now(self) -> float:
+        """Returns current time in seconds."""
+        raise NotImplementedError
+    
+
+# --------------------------------------------------
+# system clock
+# --------------------------------------------------
+class SystemClock(Clock):
+    """Production clock using system time."""
+
+    def now(self) -> float:
+        return time.time()
+    

@@ -64,6 +64,13 @@ api_rate_limiter/
 │   ├── design.md            # LLD & algorithm explanation
 │   └── api.md               # Logical API contract
 │
+├── examples/
+│   ├── __init__.py
+│   ├── token_bucket_basic.py
+│   ├── leaky_bucket_basic.py
+│   ├── middleware_example.py
+│   └── distributed_mode_note.md
+│
 ├── LICENSE
 ├── README.md
 └── setup.py

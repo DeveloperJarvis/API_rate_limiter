@@ -34,4 +34,62 @@
 # --------------------------------------------------
 # imports
 # --------------------------------------------------
+from limiter.base import BaseRateLimiter
+from protocol.request import Request
+from protocol.response import RateLimitDecision
+from state.bucket import TokenBucketState
+from concurrency.clock import Clock, SystemClock
+from concurrency.locks import LockManager
+from state.repository import BucketRepository
+from config.settings import RateLimitConfig
 
+
+# --------------------------------------------------
+# token bucket limiter
+# --------------------------------------------------
+class TokenBucketLimiter(BaseRateLimiter):
+    def __init__(
+            self,
+            repository: BucketRepository,
+            lock_manager: LockManager,
+            config: RateLimitConfig,
+            clock: Clock = None,
+        ):
+        self._repo = repository
+        self._locks = lock_manager
+        self._config = config
+        self._clock = clock or SystemClock()
+    
+    def allow(self, request: Request) -> RateLimitDecision:
+        key = request.client_id
+        now = self._clock.now()
+
+        self._locks.acquire(key)
+        try:
+            bucket = self._repo.get(key)
+            if bucket is None:
+                bucket = TokenBucketState(
+                    capacity=self._config.capacity,
+                    refill_rate=self._config.refill_rate,
+                    current_tokens=self._config.capacity,
+                    last_refill_timestamp=now,
+                )
+            
+            bucket.refill(now)
+
+            if bucket.consume(1):
+                self._repo.save(key, bucket)
+                return RateLimitDecision(
+                    allowed=True,
+                    remaining=int(bucket.current_tokens),
+                )
+            
+            retry_after = (1 / self._config.refill_rate)
+            self._repo.save(key, bucket)
+            return RateLimitDecision(
+                allowed=False,
+                remaining=int(bucket.current_tokens),
+                retry_after=retry_after,
+            )
+        finally:
+            self._locks.release(key)

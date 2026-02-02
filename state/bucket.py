@@ -30,8 +30,52 @@
 # --------------------------------------------------
 # bucket MODULE
 # --------------------------------------------------
+"""
+Bucket state is intentionally dumb.
 
+Concurrency control is handled outside
+(via LockManager or atomic store ops).
+"""
 # --------------------------------------------------
 # imports
 # --------------------------------------------------
+from dataclasses import dataclass
 
+
+# --------------------------------------------------
+# token bucket state
+# --------------------------------------------------
+@dataclass
+class TokenBucketState:
+    """
+    Mutable token bucket state.
+    """
+    
+    capacity: int
+    refill_rate: float  # tokens per second
+    current_tokens: float
+    last_refill_timestamp: float
+
+    def refill(self, now: float) -> None:
+        """
+        Refill tokens based on elapsed time.
+        """
+        elapsed = now - self.last_refill_timestamp
+        if elapsed <= 0:
+            return
+        
+        added_tokens = elapsed * self.refill_rate
+        self.current_tokens = min(
+            self.capacity,
+            self.current_tokens + added_tokens
+        )
+        self.last_refill_timestamp = now
+    
+    def consume(self, tokens: int = 1) -> bool:
+        """
+        Attempt to consume tokens.
+        """
+        if self.current_tokens >= tokens:
+            self.current_tokens -= tokens
+            return True
+        return False

@@ -34,4 +34,9 @@
 # --------------------------------------------------
 # imports
 # --------------------------------------------------
+from .api_middleware import RateLimitMiddleware
 
+
+__all__ = [
+    "RateLimitMiddleware",
+]

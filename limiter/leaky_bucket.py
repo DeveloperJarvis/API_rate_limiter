@@ -34,4 +34,73 @@
 # --------------------------------------------------
 # imports
 # --------------------------------------------------
+from limiter.base import BaseRateLimiter
+from protocol.request import Request
+from protocol.response import RateLimitDecision
+from concurrency.clock import Clock, SystemClock
+from concurrency.locks import LockManager
+from state.repository import BucketRepository
+from config.settings import RateLimitConfig
 
+
+# --------------------------------------------------
+# leaky bucket limiter
+# --------------------------------------------------
+class LeakyBucketLimiter(BaseRateLimiter):
+    """
+    Simplified leaky bucket:
+    - capacity = max queued requests
+    - refill_rate = drain rate (req/sec)
+    """
+
+    def __init__(
+            self,
+            repository: BucketRepository,
+            lock_manager: LockManager,
+            config: RateLimitConfig,
+            clock: Clock = None,
+        ):
+        self._repo = repository
+        self._locks = lock_manager
+        self._config = config
+        self._clock = clock or SystemClock()
+    
+    def allow(self, request: Request) -> RateLimitDecision:
+        key = request.client_id
+        now = self._clock.now()
+
+        self._locks.acquire(key)
+        try:
+            bucket = self._repo.get(key)
+            if bucket is None:
+                bucket = {
+                    "queue": 0,
+                    "last_drain": now,
+                }
+            
+            elapsed = now - bucket["last_drain"]
+            drained = int(
+                elapsed * self._config.refill_rate)
+            if drained > 0:
+                bucket["queue"] = max(
+                    0, bucket["queue"] - drained
+                )
+                bucket["last_drain"] = now
+            
+            if bucket["queue"] < self._config.capacity:
+                bucket["queue"] += 1
+                self._repo.save(key, bucket)
+                return RateLimitDecision(
+                    allowed=True,
+                    remaining=(self._config.capacity
+                               - bucket["queue"]),
+                )
+            
+            self._repo.save(key, bucket)
+            return RateLimitDecision(
+                allowed=False,
+                remaining=0,
+                retry_after=1 / self._config.refill_rate,
+            )
+        finally:
+            self._locks.release(key)

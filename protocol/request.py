@@ -34,4 +34,28 @@
 # --------------------------------------------------
 # imports
 # --------------------------------------------------
+from dataclasses import dataclass
+from typing import Optional
 
+
+# --------------------------------------------------
+# request
+# --------------------------------------------------
+@dataclass(frozen=True)
+class Request:
+    """
+    Logical request representation for rate limiting.
+
+    This is intentionally decoupled from any web
+    framework.
+    """
+
+    client_id: Optional[str] = None
+    enpoint: Optional[str] = None
+
+    # Optional identity fields
+    api_key: Optional[str] = None
+    user_id: Optional[str] = None
+    ip_address: Optional[str] = None
+
+    timestamp: Optional[float] = None

@@ -34,4 +34,38 @@
 # --------------------------------------------------
 # imports
 # --------------------------------------------------
+import time
 
+from limiter.token_bucket import TokenBucketLimiter
+from config.settings import RateLimitConfig
+from state.memory_store import InMemoryBucketRepository
+from concurrency.locks import LockManager
+from protocol.request import Request
+
+
+def test_token_bucket_allows_burst_then_throttles():
+    repo = InMemoryBucketRepository()
+    locks = LockManager()
+    config = RateLimitConfig(capacity=2, refill_rate=1)
+
+    limiter = TokenBucketLimiter(repo, locks, config)
+    req = Request(client_id="client", enpoint="/api")
+
+    assert limiter.allow(req).allowed is True
+    assert limiter.allow(req).allowed is True
+    assert limiter.allow(req).allowed is False
+
+
+def test_token_bucket_refills_over_time():
+    repo = InMemoryBucketRepository()
+    locks = LockManager()
+    config = RateLimitConfig(capacity=1, refill_rate=1)
+
+    limiter = TokenBucketLimiter(repo, locks, config)
+    req = Request(client_id="client", enpoint="/api")
+
+    assert limiter.allow(req).allowed is True
+    assert limiter.allow(req).allowed is False
+
+    time.sleep(1.1)
+    assert limiter.allow(req).allowed is True

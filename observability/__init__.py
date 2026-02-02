@@ -34,4 +34,11 @@
 # --------------------------------------------------
 # imports
 # --------------------------------------------------
+from .logger import log_throttled
+from .metrics import record_decision
 
+
+__all__ = [
+    "log_throttled",
+    "record_decision",
+]

@@ -34,9 +34,9 @@
 # --------------------------------------------------
 # imports
 # --------------------------------------------------
-from .identifiers import extract_client_id
+from .fake_clock import FakeClock
 
 
 __all__ = [
-    "extract_client_id",
+    "FakeClock",
 ]

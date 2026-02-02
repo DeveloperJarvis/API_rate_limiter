@@ -34,4 +34,21 @@
 # --------------------------------------------------
 # imports
 # --------------------------------------------------
+import logging
+from config.constants import LOG_FILE, LOG_FORMAT
 
+
+logger = logging.getLogger("api_rate_limiter")
+logger.setLevel(logging.INFO)
+
+handler = logging.FileHandler(LOG_FILE)
+formatter = logging.Formatter(LOG_FORMAT)
+handler.setFormatter(formatter)
+logger.addHandler(handler)
+
+
+def log_throttled(client_id: str, endpoint: str):
+    logger.warning(
+        f"Rate limit exceeded | client={client_id} "
+        f"endpoint={endpoint}"
+    )

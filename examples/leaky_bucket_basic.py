@@ -30,8 +30,48 @@
 # --------------------------------------------------
 # leaky_bucket_basic MODULE
 # --------------------------------------------------
-
+"""
+Use case: Smooth, internal service traffic.
+"""
 # --------------------------------------------------
 # imports
 # --------------------------------------------------
+import time
 
+from limiter.manager import RateLimitManager
+from config.settings import RateLimitConfig
+from protocol.request import Request
+
+
+def run():
+    manager = RateLimitManager()
+
+    config = RateLimitConfig(
+        capacity=3,
+        refill_rate=1   # drain 1 request / second
+    )
+
+    manager.register_leaky_bucket("service_X", config)
+
+    print("== Leaky Bucket Example ==")
+
+    for i in range(6):
+        request = Request(
+            client_id="service_X",
+            enpoint="/internal/job"
+        )
+
+        decision = manager.allow_request(request)
+
+        print(
+            f"[{i}]",
+            ("✅ Allowed" if decision.allowed 
+             else "❌ Rejected"),
+             f"| remaining={decision.remaining}",
+        )
+
+        time.sleep(0.2)
+
+
+if __name__ == "__main__":
+    run()
